@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Almacenamiento Nube</title>
+    <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+            min-height: 100vh;
+            transition: background 0.6s cubic-bezier(0.4,0,0.2,1);
+        }
+        .container {
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+            border-radius: 1.5rem;
+            transition: box-shadow 0.4s cubic-bezier(0.4,0,0.2,1);
+            animation: fadeInUp 0.8s cubic-bezier(0.4,0,0.2,1);
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .tab-button {
+            transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 2px 8px 0 rgba(59,130,246,0.08);
+            background: linear-gradient(90deg, #f1f5f9 0%, #e0e7ff 100%);
+            color: #2563eb;
+            border: none;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .tab-button.active {
+            background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+            color: #fff;
+            box-shadow: 0 4px 16px 0 rgba(59,130,246,0.18);
+            transform: scale(1.04);
+        }
+        .tab-button:not(.active):hover {
+            background: linear-gradient(90deg, #dbeafe 0%, #f1f5f9 100%);
+            color: #1d4ed8;
+            box-shadow: 0 2px 12px 0 rgba(59,130,246,0.10);
+            transform: translateY(-2px) scale(1.02);
+        }
+        .tab-button:focus {
+            box-shadow: 0 0 0 3px #93c5fd;
+        }
+        .table-container {
+            position: relative;
+            border-radius: 1rem;
+            overflow: auto;
+            box-shadow: 0 2px 16px 0 rgba(59,130,246,0.07);
+            animation: fadeInUp 0.8s 0.1s backwards;
+            background: #fff;
+        }
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 900px;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #fff;
+            color: #2563eb;
+            font-weight: 700;
+            font-size: 1rem;
+            border-bottom: 2px solid #2563eb;
+            box-shadow: 0 2px 8px 0 rgba(59,130,246,0.06);
+        }
+        tbody tr:nth-child(even) {
+            background: #f3f6fd;
+        }
+        tbody tr:nth-child(odd) {
+            background: #fff;
+        }
+        tbody tr:hover {
+            background: #e0e7ff !important;
+            box-shadow: 0 2px 12px 0 rgba(59,130,246,0.10);
+            animation: rowHighlight 0.3s;
+        }
+        td, th {
+            border-right: 1px solid #e5e7eb;
+        }
+        td:last-child, th:last-child {
+            border-right: none;
+        }
+        td {
+            transition: background 0.2s, color 0.2s;
+        }
+        td:focus, td:hover {
+            background: #dbeafe;
+            outline: none;
+        }
+        /* Scrollbar visible y mejorado */
+        .table-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #c7d2fe;
+            border-radius: 10px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #6366f1;
+        }
+        /* Indicador de scroll horizontal */
+        .table-container::after {
+            content: '← Desliza para ver más →';
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(59,130,246,0.08);
+            color: #2563eb;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            pointer-events: none;
+            opacity: 0.7;
+            z-index: 10;
+            display: none;
+        }
+        .table-container.scrolling::after {
+            display: block;
+        }
+        /* Fijar la primera columna (opcional, solo si hay muchas columnas) */
+        /*
+        th:first-child, td:first-child {
+            position: sticky;
+            left: 0;
+            background: #f1f5f9;
+            z-index: 3;
+            box-shadow: 2px 0 8px 0 rgba(59,130,246,0.04);
+        }
+        */
+        /* Tooltip personalizado */
+        .custom-tooltip {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translateX(-50%) translateY(8px);
+            background: rgba(31,41,55,0.97);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            white-space: pre-line;
+            z-index: 100;
+            box-shadow: 0 4px 16px 0 rgba(31,41,55,0.18);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        td.show-tooltip .custom-tooltip {
+            display: block;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        /* Animación de resaltado de fila */
+        tbody tr:hover {
+            background: #e0e7ff;
+            box-shadow: 0 2px 12px 0 rgba(59,130,246,0.10);
+            animation: rowHighlight 0.3s;
+        }
+        .chart-container {
+            margin: 10px auto;
+            height: 480px;
+            min-height: 400px;
+            width: 100%;
+            min-width: 320px;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e0e7ff 100%);
+            border-radius: 1rem;
+            box-shadow: 0 2px 16px 0 rgba(59,130,246,0.07);
+            padding: 1.5rem 1rem;
+            animation: fadeInUp 0.8s 0.2s backwards;
+        }
+        .avg-provider-value {
+            color: #111 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-6 md:p-8">
+    <div class="container mx-auto max-w-7xl bg-white shadow-xl rounded-lg p-4 sm:p-6 md:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Comparador de Precios de Almacenamiento en Nube</h1>
+            <p class="text-gray-600 mt-1">Selecciona una región para ver los datos y gráficos comparativos.</p>
+        </header>
+
+        <div class="mb-6 flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <button id="btnSouthAmerica" class="tab-button active text-sm sm:text-base font-medium py-2 px-4 rounded-md border border-blue-500 text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+               South America (Sao Paulo)
+            </button>
+            <button id="btnUSEast" class="tab-button text-sm sm:text-base font-medium py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50">
+                US East (Virginia)
+            </button>
+        </div>
+
+        <div id="tableContainer" class="table-container overflow-x-auto shadow-md rounded-lg mb-8">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 text-center">Precio Promedio Mensual</h3>
+                <div class="chart-container">
+                    <canvas id="avgMonthlyStoragePriceChart"></canvas>
+                </div>
+                <div id="avgMonthlyStorageValue" class="text-center mt-4 text-xl font-bold text-blue-700"></div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 text-center">Precio Promedio a 1 Año</h3>
+                <div class="chart-container">
+                    <canvas id="avg1YearPriceChart"></canvas>
+                </div>
+                <div id="avg1YearPriceValue" class="text-center mt-4 text-xl font-bold text-blue-700"></div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 text-center">Precio Promedio a 3 Años</h3>
+                <div class="chart-container">
+                    <canvas id="avg3YearPriceChart"></canvas>
+                </div>
+                <div id="avg3YearPriceValue" class="text-center mt-4 text-xl font-bold text-blue-700"></div>
+            </div>
+        </div>
+
+         <div id="messageBox" class="fixed bottom-5 right-5 bg-red-500 text-white p-4 rounded-lg shadow-md hidden z-50">
+            <p id="messageText"></p>
+        </div>
+    </div>
+
+    <script>
+        // Datos CSV directamente en el script
+        const southAmericaCsv = `Region,Machine Name,Cores/vCPUs,Memory (GiB),Storage (GiB),AWS Storage Price/Month,AWS 1 year Price,AWS 3 years Price,Google Storage Price/Month,Google Cloud 1 year Price,Google Cloud 3 years Price,Azure Storage Price/Month,Azure 1 year Price,Azure 3 años Price
+SouthAmerica,Guest VM 1,4,16,0,0,136.59,104.3,0,106.08,75.78,0.56,96.7,62.46
+SouthAmerica,Guest VM 10,1,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 11,1,4,0,0,45.99,39.42,0,50.35,31.96,0.56,43.05,27.94
+SouthAmerica,Guest VM 12,1,4,0,0,45.99,39.42,0,50.35,31.96,0.56,43.05,27.94
+SouthAmerica,Guest VM 13,2,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 14,2,64,0,0,383.25,301.49,0,306.16,218.69,0.56,253.14,163.2
+SouthAmerica,Guest VM 15,8,12,0,0,262.14,178.53,0,201.39,127.82,0.56,170.43,109.99
+SouthAmerica,Guest VM 16,14,32,0,0,524.29,357.05,0,503.47,319.57,0.56,340.3,219.34
+SouthAmerica,Guest VM 17,4,8,0,0,131.07,89.26,0,125.87,79.89,0.56,85.46,55.24
+SouthAmerica,Guest VM 18,2,26,0,0,191.99,150.38,0,153.08,109.34,0.56,126.85,81.88
+SouthAmerica,Guest VM 19,8,16,0,0,262.14,178.53,0,201.39,127.82,0.56,170.43,109.99
+SouthAmerica,Guest VM 2,2,8,410,77.9,146.2,130.05,26.24,82.98,66.76,71.68,119.79,102.63
+SouthAmerica,Guest VM 20,8,16,0,0,262.14,178.53,0,201.39,127.82,0.56,170.43,109.99
+SouthAmerica,Guest VM 21,4,8,0,0,131.07,89.26,0,125.87,79.89,0.56,85.46,55.24
+SouthAmerica,Guest VM 22,6,16,0,0,262.14,178.53,0,201.39,127.82,0.56,170.43,109.99
+SouthAmerica,Guest VM 23,2,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 24,8,16,0,0,262.14,178.53,0,201.39,127.82,0.56,170.43,109.99
+SouthAmerica,Guest VM 25,6,20,0,0,273.18,208.61,0,212.17,151.56,0.56,192.84,124.37
+SouthAmerica,Guest VM 26,6,28,0,0,273.18,208.61,0,212.17,151.56,0.56,192.84,124.37
+SouthAmerica,Guest VM 27,2,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 28,2,16,0,0,95.63,75.19,0,76.54,54.67,0.56,63.71,41.22
+SouthAmerica,Guest VM 29,3,22,0,0,191.99,150.38,0,153.08,109.34,0.56,126.85,81.88
+SouthAmerica,Guest VM 3,4,8,0,0,131.07,89.26,0,125.87,79.89,0.56,85.46,55.24
+SouthAmerica,Guest VM 30,8,22,0,0,273.18,208.61,0,212.17,151.56,0.56,192.84,124.37
+SouthAmerica,Guest VM 31,2,12,0,0,95.63,75.19,0,76.54,54.67,0.56,63.71,41.22
+SouthAmerica,Guest VM 32,1,12,100,19,114.63,94.19,6.4,82.94,61.07,17.92,81.07,58.58
+SouthAmerica,Guest VM 4,1,16,0,0,95.63,75.19,0,76.54,54.67,0.56,63.71,41.22
+SouthAmerica,Guest VM 5,2,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 6,1,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 7,2,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 8,1,8,0,0,68.3,52.15,0,56.74,40.52,0.56,48.67,31.51
+SouthAmerica,Guest VM 9,2,16,0,0,95.63,75.19,0,76.54,54.67,0.56,63.71,41.22`;
+
+        const usEastCsv = `Region,Machine Name,Cores/vCPUs,Memory (GiB),Storage (GiB),AWS Storage Price/Month,AWS 1 year Price,AWS 3 years Price,Google Storage Price/Month,Google Cloud 1 year Price,Google Cloud 3 years Price,Azure Storage Price/Month,Azure 1 year Price,Azure 3 años Price
+USEast,Guest VM 1,4,16,0,0,91.98,63.51,0,75.25,53.74,0.3,60.82,39.28
+USEast,Guest VM 10,1,8,0,0,40.24,28.97,0,69.28,35.2,0.3,56.36,42.35
+USEast,Guest VM 11,1,4,0,0,31.08,21.45,0,40.16,26.84,0.3,56.36,52.86
+USEast,Guest VM 12,1,4,0,0,31.08,21.45,0,40.16,26.84,0.3,56.36,52.86
+USEast,Guest VM 13,2,8,0,0,45.99,31.39,0,38.23,27.31,0.3,30.52,19.79
+USEast,Guest VM 14,2,64,0,0,239.44,172.28,0,206.3,147.36,0.3,159.15,102.57
+USEast,Guest VM 15,8,12,0,0,161.42,107.85,0,167.39,111.88,0.3,107.17,69.14
+USEast,Guest VM 16,14,32,0,0,322.85,215.71,0,334.79,223.76,0.3,213.97,137.91
+USEast,Guest VM 17,4,8,0,0,80.71,53.93,0,84.81,56.68,0.3,53.74,34.68
+USEast,Guest VM 18,2,26,0,0,119.72,86.14,0,103.15,73.68,0.3,79.72,51.47
+USEast,Guest VM 19,8,16,0,0,161.42,107.85,0,169.63,113.38,0.3,107.17,69.14
+USEast,Guest VM 2,2,8,410,41,86.99,72.39,6.56,44.79,33.87,38.4,68.62,57.89
+USEast,Guest VM 20,8,16,0,0,161.42,107.85,0,169.63,113.38,0.3,107.17,69.14
+USEast,Guest VM 21,4,8,0,0,80.71,53.93,0,84.81,56.68,0.3,53.74,34.68
+USEast,Guest VM 22,6,16,0,0,161.42,107.85,0,167.39,111.88,0.3,107.17,69.14
+USEast,Guest VM 23,2,8,0,0,45.99,31.39,0,38.23,27.31,0.3,30.52,19.79
+USEast,Guest VM 24,8,16,0,0,161.42,107.85,0,169.63,113.38,0.3,107.17,69.14
+USEast,Guest VM 25,6,20,0,0,183.96,127.02,0,150.5,107.49,0.3,121.19,78.19
+USEast,Guest VM 26,6,28,0,0,183.96,127.02,0,150.5,107.49,0.3,121.19,78.19
+USEast,Guest VM 27,2,8,0,0,45.99,31.39,0,38.23,27.31,0.3,30.52,19.79
+USEast,Guest VM 28,2,16,0,0,59.86,43.07,0,51.57,36.84,0.3,40.09,25.92
+USEast,Guest VM 29,3,22,0,0,119.72,86.14,0,103.15,73.68,0.3,79.72,51.47
+USEast,Guest VM 3,4,8,0,0,80.71,53.93,0,84.81,56.68,0.3,53.74,34.68
+USEast,Guest VM 30,8,22,0,0,183.96,127.02,0,150.5,107.49,0.3,121.19,78.19
+USEast,Guest VM 31,2,12,0,0,59.86,43.07,0,51.57,36.84,0.3,40.09,25.92
+USEast,Guest VM 32,1,12,100,10,69.86,53.07,1.6,53.17,38.44,9.6,49.39,35.22
+USEast,Guest VM 4,1,16,0,0,59.86,43.07,0,51.57,36.84,0.3,40.09,25.92
+USEast,Guest VM 5,2,8,0,0,45.99,31.39,0,38.23,27.31,0.3,30.52,19.79
+USEast,Guest VM 6,1,8,0,0,40.24,28.97,0,69.28,35.2,0.3,56.36,42.35
+USEast,Guest VM 7,2,8,0,0,45.99,31.39,0,38.23,27.31,0.3,30.52,19.79
+USEast,Guest VM 8,1,8,0,0,40.24,28.97,0,69.28,35.2,0.3,56.36,42.35
+USEast,Guest VM 9,2,16,0,0,59.86,43.07,0,51.57,36.84,0.3,40.09,25.92`;
+
+        // Variables globales para las instancias de los gráficos
+        let avgMonthlyStoragePriceChartInstance = null;
+        let avg1YearPriceChartInstance = null;
+        let avg3YearPriceChartInstance = null;
+
+        // Función para convertir texto CSV a un array de objetos
+        function csvToObjects(csvText) {
+            try {
+                const lines = csvText.trim().split('\n');
+                if (lines.length < 2) return []; 
+
+                let headers = lines[0].split(',').map(header =>
+                    header.trim()
+                          .replace(/\s+/g, '_') 
+                          .replace(/[\(\)]/g, '')    
+                          .replace(/\//g, '_')      
+                );
+                headers = headers.map(h => h === 'Azure_3_años_Price' ? 'Azure_3_years_Price' : h);
+
+                return lines.slice(1).map(line => {
+                    // --- CORRECCIÓN: Soportar comas dentro de valores y asegurar longitud de valores igual a headers ---
+                    let values = line.split(',');
+                    if (values.length > headers.length) {
+                        // Unir los valores sobrantes en la última columna
+                        const extra = values.slice(headers.length - 1).join(',');
+                        values = values.slice(0, headers.length - 1).concat(extra);
+                    } else if (values.length < headers.length) {
+                        // Rellenar con vacío si faltan columnas
+                        while (values.length < headers.length) values.push('');
+                    }
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = values[index] ? values[index].trim() : '';
+                    });
+                    return obj;
+                });
+            } catch (error) {
+                console.error("Error parsing CSV data:", error);
+                showMessage("Error al procesar los datos CSV. Verifique la consola para más detalles.");
+                return [];
+            }
+        }
+
+        const southAmericaData = csvToObjects(southAmericaCsv);
+        const usEastData = csvToObjects(usEastCsv);
+
+        const table = document.querySelector('#tableContainer table');
+        const tableHead = table.querySelector('thead');
+        const tableBody = table.querySelector('tbody');
+        const btnSouthAmerica = document.getElementById('btnSouthAmerica');
+        const btnUSEast = document.getElementById('btnUSEast');
+
+        function showMessage(message, duration = 3000) {
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, duration);
+        }
+
+        function renderTable(data) {
+            if (!data || data.length === 0) {
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = '<tr><td colspan="100%" class="text-center py-4">No hay datos disponibles.</td></tr>';
+                return;
+            }
+            const headers = Object.keys(data[0]);
+            // Ajuste: Si la región es SouthAmerica, corregir headers para que coincidan con US East
+            let fixedHeaders = headers;
+            if (data[0].Region === 'SouthAmerica') {
+                fixedHeaders = headers.map(h => {
+                    if (h === 'Azure_3_años_Price') return 'Azure_3_years_Price';
+                    return h;
+                });
+            }
+            tableHead.innerHTML = `
+                <tr>
+                    ${fixedHeaders.map(header => `<th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header.replace(/_/g, ' ')}</th>`).join('')}
+                </tr>
+            `;
+            tableBody.innerHTML = data.map(row => `
+                <tr class="hover:bg-gray-50">
+                    ${fixedHeaders.map(header => {
+                        const value = row[header] || '';
+                        return `<td class="px-4 py-3 text-sm text-gray-700" tabindex="0" title="${value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}">
+                            <span class="cell-content">${value}</span>
+                            <span class="custom-tooltip"></span>
+                        </td>`;
+                    }).join('')}
+                </tr>
+            `).join('');
+
+            // Interactividad: tooltips solo si el texto está truncado
+            tableBody.querySelectorAll('td').forEach(td => {
+                const span = td.querySelector('.cell-content');
+                const tooltip = td.querySelector('.custom-tooltip');
+                const value = span.textContent;
+                function showTooltip() {
+                    // Solo mostrar si el texto está truncado
+                    if (span.offsetWidth < span.scrollWidth) {
+                        tooltip.textContent = value;
+                        td.classList.add('show-tooltip');
+                    }
+                }
+                function hideTooltip() {
+                    td.classList.remove('show-tooltip');
+                }
+                td.addEventListener('mouseenter', showTooltip);
+                td.addEventListener('mouseleave', hideTooltip);
+                td.addEventListener('focus', showTooltip);
+                td.addEventListener('blur', hideTooltip);
+            });
+        }
+
+        // Indicador de scroll horizontal en tabla
+        const tableContainer = document.getElementById('tableContainer');
+        let scrollTimeout;
+        tableContainer.addEventListener('scroll', () => {
+            tableContainer.classList.add('scrolling');
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                tableContainer.classList.remove('scrolling');
+            }, 1200);
+        });
+        function renderAveragePriceCharts(data) {
+            if (!data || data.length === 0) {
+                if (avgMonthlyStoragePriceChartInstance) avgMonthlyStoragePriceChartInstance.destroy();
+                if (avg1YearPriceChartInstance) avg1YearPriceChartInstance.destroy();
+                if (avg3YearPriceChartInstance) avg3YearPriceChartInstance.destroy();
+                document.getElementById('avgMonthlyStoragePriceChart').style.display = 'none';
+                document.getElementById('avg1YearPriceChart').style.display = 'none';
+                document.getElementById('avg3YearPriceChart').style.display = 'none';
+                document.getElementById('avgMonthlyStorageValue').textContent = '';
+                document.getElementById('avg1YearPriceValue').textContent = '';
+                document.getElementById('avg3YearPriceValue').textContent = '';
+                return;
+            }
+            document.getElementById('avgMonthlyStoragePriceChart').style.display = 'block';
+            document.getElementById('avg1YearPriceChart').style.display = 'block';
+            document.getElementById('avg3YearPriceChart').style.display = 'block';
+
+
+            const providers = ['AWS', 'Google_Cloud', 'Azure'];
+            const priceKeysMonthly = {
+                'AWS': 'AWS_Storage_Price_Month',
+                'Google_Cloud': 'Google_Storage_Price_Month',
+                'Azure': 'Azure_Storage_Price_Month'
+            };
+            const priceKeys1Year = {
+                'AWS': 'AWS_1_year_Price',
+                'Google_Cloud': 'Google_Cloud_1_year_Price',
+                'Azure': 'Azure_1_year_Price'
+            };
+            const priceKeys3Years = {
+                'AWS': 'AWS_3_years_Price',
+                'Google_Cloud': 'Google_Cloud_3_years_Price',
+                'Azure': 'Azure_3_years_Price'
+            };
+
+            function calculateAverage(data, priceKey) {
+                let sum = 0;
+                let count = 0;
+                data.forEach(row => {
+                    const price = parseFloat(row[priceKey]);
+                    if (!isNaN(price)) {
+                        sum += price;
+                        count++;
+                    }
+                });
+                return count > 0 ? (sum / count) : 0; 
+            }
+
+            // Calcular promedios
+            const avgPricesMonthly = providers.map(p => parseFloat(calculateAverage(data, priceKeysMonthly[p]).toFixed(2)));
+            const avgPrices1Year = providers.map(p => parseFloat(calculateAverage(data, priceKeys1Year[p]).toFixed(2)));
+            const avgPrices3Years = providers.map(p => parseFloat(calculateAverage(data, priceKeys3Years[p]).toFixed(2)));
+
+            // Mostrar promedios de cada nube debajo de cada gráfica, cada uno en su propia línea
+            const providerLabels = ['AWS', 'Google Cloud', 'Azure'];
+            // Logos de proveedores
+            const providerLogos = [
+                '<img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/amazonaws.svg" alt="AWS" style="width:1.5em;height:1.5em;display:inline;margin-right:0.5em;vertical-align:middle;filter:drop-shadow(0 1px 2px #ccc);">',
+                '<img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/googlecloud.svg" alt="Google Cloud" style="width:1.5em;height:1.5em;display:inline;margin-right:0.5em;vertical-align:middle;filter:drop-shadow(0 1px 2px #ccc);">',
+                '<img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/microsoftazure.svg" alt="Azure" style="width:1.5em;height:1.5em;display:inline;margin-right:0.5em;vertical-align:middle;filter:drop-shadow(0 1px 2px #ccc);">'
+            ];
+            document.getElementById('avgMonthlyStorageValue').innerHTML =
+                providerLabels.map((label, i) => `<div class="mb-1 flex items-center justify-center" style="color:#111">${providerLogos[i]}<span class="font-semibold">${label}:</span> $${avgPricesMonthly[i].toFixed(2)}</div>`).join('');
+            document.getElementById('avg1YearPriceValue').innerHTML =
+                providerLabels.map((label, i) => `<div class="mb-1 flex items-center justify-center" style="color:#111">${providerLogos[i]}<span class="font-semibold">${label}:</span> $${avgPrices1Year[i].toFixed(2)}</div>`).join('');
+            document.getElementById('avg3YearPriceValue').innerHTML =
+                providerLabels.map((label, i) => `<div class="mb-1 flex items-center justify-center" style="color:#111">${providerLogos[i]}<span class="font-semibold">${label}:</span> $${avgPrices3Years[i].toFixed(2)}</div>`).join('');
+
+
+            const chartColors = [
+                'rgba(255, 159, 64, 0.7)', // Naranja
+                'rgba(75, 192, 192, 0.7)', // Verde azulado
+                'rgba(54, 162, 235, 0.7)'  // Azul
+            ];
+            const chartBorderColors = [
+                'rgba(255, 159, 64, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(54, 162, 235, 1)'
+            ];
+
+
+            if (avgMonthlyStoragePriceChartInstance) avgMonthlyStoragePriceChartInstance.destroy();
+            if (avg1YearPriceChartInstance) avg1YearPriceChartInstance.destroy();
+            if (avg3YearPriceChartInstance) avg3YearPriceChartInstance.destroy();
+
+            // --- Gráfico de Almacenamiento Mensual ---
+            const maxMonthlyPrice = avgPricesMonthly.length > 0 ? Math.max(...avgPricesMonthly) : 0;
+            const yMaxMonthly = maxMonthlyPrice > 0 ? Math.ceil((maxMonthlyPrice * 1.1) / (maxMonthlyPrice > 10 ? 10 : 1)) * (maxMonthlyPrice > 10 ? 10 : 1) : (maxMonthlyPrice === 0 ? 1 : 10) ; // Ajuste para escalas pequeñas
+
+            const ctxMonthly = document.getElementById('avgMonthlyStoragePriceChart').getContext('2d');
+            avgMonthlyStoragePriceChartInstance = new Chart(ctxMonthly, {
+                type: 'bar',
+                data: {
+                    labels: providerLabels,
+                    datasets: [{
+                        label: 'Precio Promedio Almacenamiento Mensual ($)',
+                        data: avgPricesMonthly,
+                        backgroundColor: chartColors,
+                        borderColor: chartBorderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, min: 0, max: yMaxMonthly, title: { display: true, text: 'Precio Promedio ($)' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // --- Gráfico de Precios a 1 Año ---
+            const max1YearPrice = avgPrices1Year.length > 0 ? Math.max(...avgPrices1Year) : 0;
+            const yMax1Year = max1YearPrice > 0 ? Math.ceil((max1YearPrice * 1.1) / 10) * 10 : 10; 
+
+            const ctx1Year = document.getElementById('avg1YearPriceChart').getContext('2d');
+            avg1YearPriceChartInstance = new Chart(ctx1Year, {
+                type: 'bar',
+                data: {
+                    labels: providerLabels,
+                    datasets: [{
+                        label: 'Precio Promedio a 1 Año ($)',
+                        data: avgPrices1Year,
+                        backgroundColor: chartColors,
+                        borderColor: chartBorderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, min: 0, max: yMax1Year, title: { display: true, text: 'Precio Promedio ($)' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // --- Gráfico de Precios a 3 Años ---
+            const max3YearPrice = avgPrices3Years.length > 0 ? Math.max(...avgPrices3Years) : 0;
+            const yMax3Years = max3YearPrice > 0 ? Math.ceil((max3YearPrice * 1.1) / 10) * 10 : 10;
+
+            const ctx3Years = document.getElementById('avg3YearPriceChart').getContext('2d');
+            avg3YearPriceChartInstance = new Chart(ctx3Years, {
+                type: 'bar',
+                data: {
+                    labels: providerLabels,
+                    datasets: [{
+                        label: 'Precio Promedio a 3 Años ($)',
+                        data: avgPrices3Years,
+                        backgroundColor: chartColors,
+                        borderColor: chartBorderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, min: 0, max: yMax3Years, title: { display: true, text: 'Precio Promedio ($)' } } },
+                     plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+
+        btnSouthAmerica.addEventListener('click', () => {
+            renderTable(southAmericaData);
+            renderAveragePriceCharts(southAmericaData);
+            btnSouthAmerica.classList.add('active', 'bg-blue-600', 'text-white');
+            btnSouthAmerica.classList.remove('text-blue-600', 'hover:bg-blue-50', 'border-blue-500');
+            
+            btnUSEast.classList.remove('active', 'bg-blue-600', 'text-white');
+            btnUSEast.classList.add('text-gray-700', 'hover:bg-gray-50', 'border-gray-300');
+        });
+
+        btnUSEast.addEventListener('click', () => {
+            renderTable(usEastData);
+            renderAveragePriceCharts(usEastData);
+            btnUSEast.classList.add('active', 'bg-blue-600', 'text-white');
+            btnUSEast.classList.remove('text-gray-700', 'hover:bg-gray-50', 'border-gray-300');
+
+            btnSouthAmerica.classList.remove('active', 'bg-blue-600', 'text-white');
+            btnSouthAmerica.classList.add('text-blue-600', 'hover:bg-blue-50', 'border-blue-500');
+        });
+
+        // Renderizar la tabla y gráficos iniciales
+        if (southAmericaData.length > 0) {
+            renderTable(southAmericaData);
+            renderAveragePriceCharts(southAmericaData);
+            btnSouthAmerica.classList.add('bg-blue-600', 'text-white'); 
+            btnSouthAmerica.classList.remove('text-blue-600', 'hover:bg-blue-50', 'border-blue-500');
+        } else if (usEastData.length > 0) {
+            renderTable(usEastData);
+            renderAveragePriceCharts(usEastData);
+            btnUSEast.click(); 
+        } else {
+            showMessage("No se encontraron datos para mostrar.");
+            renderTable([]); 
+            renderAveragePriceCharts([]);
+        }
+    </script>
+</body>
+</html>
